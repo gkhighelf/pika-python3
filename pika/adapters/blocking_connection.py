@@ -59,7 +59,17 @@ class ReadPoller(object):
 
         """
         if self.poller:
-            events = self.poller.poll(self.poll_timeout)
+            try:
+                events = self.poller.poll(self.poll_timeout)
+            except RuntimeError as exception:
+                LOGGER.debug('poll RuntimeException, reinitializing')
+                self.poller = select.poll()
+                self.poll_events = select.POLLIN | select.POLLPRI
+                self.poller.register(self.fd, self.poll_events)
+
+                # Re-poll again.
+                events = self.poller.poll(self.poll_timeout)
+
             return True if events else False
         else:
             ready, unused_wri, unused_err = select.select([self.fd], [], [],
