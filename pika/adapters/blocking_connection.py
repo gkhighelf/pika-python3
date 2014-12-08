@@ -59,17 +59,7 @@ class ReadPoller(object):
 
         """
         if self.poller:
-            try:
-                events = self.poller.poll(self.poll_timeout)
-            except RuntimeError as exception:
-                LOGGER.debug('poll RuntimeException, reinitializing')
-                self.poller = select.poll()
-                self.poll_events = select.POLLIN | select.POLLPRI
-                self.poller.register(self.fd, self.poll_events)
-
-                # Re-poll again.
-                events = self.poller.poll(self.poll_timeout)
-
+            events = self.poller.poll(self.poll_timeout)
             return True if events else False
         else:
             ready, unused_wri, unused_err = select.select([self.fd], [], [],
@@ -233,7 +223,7 @@ class BlockingConnection(base_connection.BaseConnection):
 
     def process_timeouts(self):
         """Process the self._timeouts event stack"""
-        for timeout_id in list(self._timeouts.keys()):
+        for timeout_id in self._timeouts.keys():
             if self._deadline_passed(timeout_id):
                 self._call_timeout_method(self._timeouts.pop(timeout_id))
 
@@ -319,13 +309,13 @@ class BlockingConnection(base_connection.BaseConnection):
         :rtype: bool
 
         """
-        if timeout_id not in list(self._timeouts.keys()):
+        if timeout_id not in self._timeouts.keys():
             return False
         return self._timeouts[timeout_id]['deadline'] <= time.time()
 
     def _handle_disconnect(self):
         """Called internally when the socket is disconnected already"""
-        self.disconnect()
+        self._adapter_disconnect()
         self._on_connection_closed(None, True)
 
     def _handle_read(self):
@@ -517,7 +507,7 @@ class BlockingChannel(channel.Channel):
         if mandatory:
             self._response = None
 
-        if isinstance(body, str):
+        if isinstance(body, unicode):
             body = body.encode('utf-8')
 
         if self._confirmation:
@@ -934,7 +924,7 @@ class BlockingChannel(channel.Channel):
         if consumer_tag:
             self.basic_cancel(consumer_tag)
         else:
-            for consumer_tag in list(self._consumers.keys()):
+            for consumer_tag in self._consumers.keys():
                 self.basic_cancel(consumer_tag)
         self.wait = True
 
